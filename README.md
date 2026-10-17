@@ -1,7 +1,14 @@
-# shitsandgigs: colony growth over a surface
+# shitsandgigs: growth models on surfaces
 
-Simulates and visualises the density of a colony / biofilm spreading over a 2D surface,
-plus the size distribution of the colonies as they grow and merge.
+Two models:
+
+1. **Colony / biofilm spreading** ([colony_growth.py](colony_growth.py)): a Fisher–KPP
+   reaction–diffusion model with a 2D density map and the colony size distribution.
+2. **Bone remodelling** ([bone_remodelling.py](bone_remodelling.py)): the osteoclast–osteoblast
+   model of Komarova et al. (2003), plus an illustrative 2D extension. See
+   [below](#bone-remodelling-komarova-et-al-2003).
+
+---
 
 ## Governing equation
 
@@ -80,3 +87,78 @@ These are placeholders; swap in measured values for your organism.
 * MATLAB would work just as well numerically. Its built-in `pdepe` is 1D only, so you'd write
   the same finite-difference loop by hand either way. It's mainly worth choosing if your group
   or course already standardises on it.
+
+---
+
+## Bone remodelling: Komarova et al. (2003)
+
+Komarova S.V., Smith R.J., Dixon S.J., Sims S.M., Wahl L.M. (2003). *Mathematical model predicts a
+critical role for osteoclast autocrine regulation in the control of bone remodeling.*
+Bone 33(2):206–215.
+
+### Equations
+
+At one remodelling site, the osteoclast count `C`, the osteoblast count `B` and the bone mass `z`
+(% of initial) follow
+
+    dC/dt = α₁ C^g₁₁ B^g₂₁ − β₁ C
+    dB/dt = α₂ C^g₁₂ B^g₂₂ − β₂ B
+    dz/dt = −k₁ max(C − C*, 0) + k₂ max(B − B*, 0)
+
+* The first term in each cell equation is production. The power laws describe signalling between
+  the cell types, with each exponent setting the strength and sign of one interaction:
+  * `g₁₁ = 0.5`: osteoclast autocrine signalling (osteoclasts stimulating more osteoclasts).
+  * `g₂₁ = −0.5`: osteoblasts inhibiting osteoclast formation, via the RANKL/OPG balance.
+  * `g₁₂ = 1`: osteoclasts stimulating osteoblasts. This couples resorption to formation (e.g.
+    through factors released from the matrix such as TGF-β).
+  * `g₂₂ = 0`: no osteoblast autocrine signalling.
+* The second term in each cell equation is cell removal (apoptosis).
+* Bone is resorbed in proportion to the osteoclasts above their steady-state number, and formed in
+  proportion to the osteoblasts above theirs.
+
+**Steady state:** setting both cell equations to zero, with `Γ = g₁₂g₂₁ − (1−g₁₁)(1−g₂₂)`, gives
+
+    C* = (β₁/α₁)^((1−g₂₂)/Γ) · (β₂/α₂)^(g₂₁/Γ)
+    B* = (β₁/α₁)^(g₁₂/Γ) · (β₂/α₂)^((1−g₁₁)/Γ)
+
+**Stability:** set by the eigenvalues of the Jacobian at `(C*, B*)`. The trace is
+`β₁(g₁₁−1) + β₂(g₂₂−1)`, so osteoclast autocrine signalling (`g₁₁`) controls whether a perturbation
+decays (a single remodelling cycle) or keeps cycling. That is the paper's main conclusion.
+
+### Results with the paper's parameters
+
+`α₁=3, α₂=4, β₁=0.2, β₂=0.02, k₁=0.24, k₂=0.0017`, with an initial perturbation of 10 extra
+osteoclasts:
+
+| `g₁₁` | Behaviour | Bone mass |
+|---|---|---|
+| 0.5 (default) | A single damped cycle: resorption, then formation | Drops to ~90%, returns to ~100% |
+| 1.1 | Eigenvalues purely imaginary, so the cycles never die out | Each cycle loses ~10%, because `k₁`/`k₂` are balanced for the `g₁₁ = 0.5` case |
+
+The code computes `C* ≈ 1.06` and `B* ≈ 212` for the default parameters, matching the paper.
+
+### 2D extension (not in the paper)
+
+`--spatial` uses the same kinetics at every point of a 2 mm × 2 mm bone surface, with cells moving
+by diffusion, and starts remodelling events (e.g. after microdamage) at random places and times:
+
+    ∂C/∂t = D_C ∇²C + (Komarova kinetics)
+    ∂B/∂t = D_B ∇²B + (Komarova kinetics)
+
+The animation shows resorption pits opening as osteoclasts gather, osteoblasts arriving, and the
+pits refilling.
+
+Osteoblasts have to stay close to where they formed. If `D_B` is too large, they spread out and
+deposit bone in a ring around the pit, so the pit never fully refills. The defaults
+(`D_C = 1e-5`, `D_B = 1e-6` mm²/day) give ~99.8% refill. This is an illustrative extension, not a
+validated model. For published spatial versions, see Ryser, Nigam & Komarova (2009, J. Bone
+Miner. Res.) and Buenzli et al. (2011, J. Theor. Biol.), which model a moving BMU.
+
+### Usage
+
+```bash
+python bone_remodelling.py                 # original ODE model -> bone_remodelling.png
+python bone_remodelling.py --g11 1.1       # sustained remodelling cycles
+python bone_remodelling.py --spatial       # 2D bone surface -> bone_remodelling_2d.gif
+python bone_remodelling.py --help
+```

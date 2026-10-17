@@ -18,11 +18,12 @@ Units are up to you as long as they are consistent; defaults use mm and hours.
 """
 
 import argparse
+import shutil
 from dataclasses import dataclass
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 from scipy import ndimage
 
 
@@ -114,7 +115,20 @@ def colony_areas(frame, threshold, dx):
     return np.bincount(labels.ravel())[1:] * dx**2
 
 
-def animate(p, xs, times, frames, out):
+def ffmpeg_path():
+    """System ffmpeg if available, else the binary bundled with imageio-ffmpeg."""
+    path = shutil.which("ffmpeg")
+    if path:
+        return path
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        return None
+
+
+def animate(p, xs, times, frames, out, video=None):
+    """Save the animation as a GIF at `out`, and as an MP4 at `video` if given."""
     dx = xs[1] - xs[0]
     areas = [colony_areas(f, p.threshold, dx) for f in frames]
     a_max = max((a.max() for a in areas if a.size), default=1.0)
@@ -144,8 +158,19 @@ def animate(p, xs, times, frames, out):
     fig.tight_layout()
     anim = FuncAnimation(fig, draw, frames=len(frames), interval=80)
     anim.save(out, writer=PillowWriter(fps=12))
-    plt.close(fig)
     print(f"saved {out}")
+    if video:
+        ffmpeg = ffmpeg_path()
+        if ffmpeg is None:
+            print(f"skipped {video}: no ffmpeg found (pip install imageio-ffmpeg)")
+        else:
+            plt.rcParams["animation.ffmpeg_path"] = ffmpeg
+            # yuv420p + even pixel dimensions keep the MP4 playable in QuickTime/browsers
+            anim.save(video, writer=FFMpegWriter(fps=12, codec="libx264",
+                                                 extra_args=["-pix_fmt", "yuv420p"]),
+                      dpi=100, savefig_kwargs={"pad_inches": 0})
+            print(f"saved {video}")
+    plt.close(fig)
 
 
 def snapshot_figure(p, xs, times, frames, out, n_snap=4):
@@ -204,7 +229,7 @@ def main():
         front_speed_check(p)
         return
     xs, times, frames = simulate(p)
-    animate(p, xs, times, frames, f"{out}.gif")
+    animate(p, xs, times, frames, f"{out}.gif", video=f"{out}.mp4")
     snapshot_figure(p, xs, times, frames, f"{out}_snapshots.png")
 
 

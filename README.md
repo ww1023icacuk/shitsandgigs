@@ -65,8 +65,9 @@ python colony_growth.py --nutrient --m 1 --D0 0.02 --out biofilm
 python colony_growth.py --help                 # all parameters
 ```
 
-Each run writes `<out>.gif` (an animated density map next to a live size histogram) and
-`<out>_snapshots.png`.
+Each run writes `<out>.gif` (an animated density map next to a live size histogram), the same
+animation as `<out>.mp4` (H.264), and `<out>_snapshots.png`. The MP4 uses a system `ffmpeg` if
+one is on the PATH, otherwise the binary bundled with `imageio-ffmpeg`; with neither, it is skipped.
 
 Default units are mm and hours: `D₀ = 0.01 mm²/h` and `r = 1 /h`, so fronts move at 0.2 mm/h.
 These are placeholders; swap in measured values for your organism.

@@ -5,7 +5,8 @@ Two models:
 1. **Colony / biofilm spreading** ([colony_growth.py](colony_growth.py)): a Fisher–KPP
    reaction–diffusion model with a 2D density map and the colony size distribution.
 2. **Bone remodelling** ([bone_remodelling.py](bone_remodelling.py)): the osteoclast–osteoblast
-   model of Komarova et al. (2003), plus an illustrative 2D extension. See
+   model of Komarova et al. (2003), plus an illustrative 2D extension and a demo
+   ([bone_demo.py](bone_demo.py)) of how the two cell types drive net bone gain or loss. See
    [below](#bone-remodelling-komarova-et-al-2003).
 
 ---
@@ -153,6 +154,36 @@ deposit bone in a ring around the pit, so the pit never fully refills. The defau
 (`D_C = 1e-5`, `D_B = 1e-6` mm²/day) give ~99.8% refill. This is an illustrative extension, not a
 validated model. For published spatial versions, see Ryser, Nigam & Komarova (2009, J. Bone
 Miner. Res.) and Buenzli et al. (2011, J. Theor. Biol.), which model a moving BMU.
+
+### Demo: osteoclast vs osteoblast activity on a neutral substrate
+
+[bone_demo.py](bone_demo.py) runs the 2D model four times on a **neutral substrate**: a uniform
+bone surface with an even nutrient supply, so every parameter is the same everywhere. All four runs
+use the *same* random remodelling events (0.3 per day for 2 years), so the differences come only
+from cell activity:
+
+| Scenario | Change | Mean bone mass after 720 days |
+|---|---|---|
+| Balanced | paper values | −0.6% |
+| Osteoclast-dominant | resorption per osteoclast `k₁ × 1.5` | **−15.3%** |
+| Osteoblast-dominant | formation per osteoblast `k₂ × 1.5` | **+13.8%** |
+| High turnover | `k₁` and `k₂ × 1.5` | −0.9% |
+
+What it shows:
+
+* **Bone mass depends on the balance between resorption and formation, not on how active the cells
+  are overall.** High turnover digs much deeper pits (~85% at the deepest point vs ~90% when
+  balanced) but still refills them completely.
+* **A small imbalance per cycle adds up.** A single cycle with `k₁ × 1.5` leaves a 7% deficit at
+  that site, and hundreds of overlapping cycles drive steady loss across the whole surface. This is
+  the mechanism behind osteoporosis. The osteoblast-dominant case is the reverse (anabolic gain).
+* The small dip in the balanced runs comes from pits still mid-cycle at the end of the run
+  (resorbed but not yet refilled).
+
+```bash
+python bone_demo.py                        # -> bone_demo.png, bone_demo.gif
+python bone_demo.py --event-rate 0.6 --t-end 1000
+```
 
 ### Usage
 

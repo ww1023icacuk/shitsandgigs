@@ -129,7 +129,11 @@ class SpatialParams:
     rng_seed: int = 0
 
 
-def run_spatial(p, s, out):
+def simulate_spatial(p, s):
+    """Integrate the 2D model. Returns snapshot times and z, C, B frames.
+
+    Remodelling events depend only on s.rng_seed, so runs with different
+    kinetic parameters but the same seed see identical events."""
     Cs, Bs = steady_state(p)
     rng = np.random.default_rng(s.rng_seed)
     dx = s.L / s.N
@@ -169,8 +173,12 @@ def run_spatial(p, s, out):
         z = z + dt * dz
 
     print(f"{n_events} remodelling events; mean bone mass at end {z.mean():.2f} %")
+    return np.array(times), *map(np.array, (z_frames, C_frames, B_frames))
 
-    z_frames, C_frames, B_frames = map(np.array, (z_frames, C_frames, B_frames))
+
+def run_spatial(p, s, out):
+    Cs, Bs = steady_state(p)
+    times, z_frames, C_frames, B_frames = simulate_spatial(p, s)
     z_lo = min(z_frames.min(), 99.0)
     z_hi = max(z_frames.max(), 101.0)
     extent = [0, s.L, 0, s.L]
